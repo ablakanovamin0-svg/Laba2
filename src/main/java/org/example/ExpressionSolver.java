@@ -61,7 +61,7 @@ public class ExpressionSolver {
     }
 
     public double getVariable(String name) {
-
+        return variables.get(name);
     }
 
     public void removeVariable(String name) {
