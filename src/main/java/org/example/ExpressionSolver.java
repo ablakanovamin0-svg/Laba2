@@ -73,7 +73,9 @@ public class ExpressionSolver {
     }
 
     private void promptForVariableValue(String variableName) {
-
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("Введите значение для переменной '" + variableName + "': ");
+        variables.put(variableName, scanner.nextDouble());
     }
 
     private double parseNumberOrFunction(String token) throws Exception {
