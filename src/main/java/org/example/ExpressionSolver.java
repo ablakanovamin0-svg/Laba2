@@ -65,11 +65,11 @@ public class ExpressionSolver {
     }
 
     public void removeVariable(String name) {
-
+        variables.remove(name);
     }
 
     public List<String> listVariables() {
-
+        return new ArrayList<>(variables.keySet());
     }
 
     private void promptForVariableValue(String variableName) {
