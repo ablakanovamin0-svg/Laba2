@@ -57,7 +57,7 @@ public class ExpressionSolver {
     }
 
     public void setVariable(String name, double value) {
-
+        variables.put(name, value);
     }
 
     public double getVariable(String name) {
