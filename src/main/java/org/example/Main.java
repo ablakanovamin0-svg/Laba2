@@ -2,7 +2,15 @@ package org.example;
 
 import java.util.List;
 
+/**
+ * Класс для показа функционала объекта созданного класса ExpressionSolver
+ * @author ablakanovamin0-svg
+ * @version 1.0
+ */
 public class Main {
+    /**
+     * Показ функционала методов класса ExpressionSolver
+     */
     static void main() {
         ExpressionSolver expressionSolver = new ExpressionSolver();
 
