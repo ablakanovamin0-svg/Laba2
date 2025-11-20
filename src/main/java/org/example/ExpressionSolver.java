@@ -7,7 +7,6 @@ import java.util.*;
  * @author ablakanovamin0-svg
  * @version 1.0
  */
-
 public class ExpressionSolver {
 
     private final Map<String, Double> variables = new HashMap<>();
@@ -18,54 +17,122 @@ public class ExpressionSolver {
      * @throws Exception, если не удалось разобрать выражение
      */
     public double evaluate(String expression) throws Exception {
-        Set<String> usedVariables = new HashSet<>(); // Набор используемых переменных
+        Set<String> usedVariables = new HashSet<>();
         Stack<Double> values = new Stack<>();
         Stack<Character> operators = new Stack<>();
+
+        Character prevChar = null;
 
         for (int i = 0; i < expression.length(); i++) {
             char currentChar = expression.charAt(i);
 
             if (Character.isWhitespace(currentChar)) continue;
 
-            if (Character.isDigit(currentChar)) { // Обрабатываем числа
+            if (Character.isDigit(currentChar) || currentChar == '.') {
                 StringBuilder number = new StringBuilder();
+                boolean dotUsed = false;
 
-                while ((i < expression.length()) && Character.isDigit(expression.charAt(i)))
-                    number.append(expression.charAt(i++));
+                while (i < expression.length()) {
+                    char c = expression.charAt(i);
+                    if (Character.isDigit(c)) {
+                        number.append(c);
+                        i++;
+                    } else if (c == '.' && !dotUsed) {
+                        number.append('.');
+                        dotUsed = true;
+                        i++;
+                    } else break;
+                }
                 i--;
-
                 values.push(Double.parseDouble(number.toString()));
-            } else if (isOperator(currentChar)) { // Обрабатываем операторы
-                processOperators(operators, values, currentChar);
-            } else if (currentChar == '(') { // Открывающая скобка
-                operators.push(currentChar);
-            } else if (currentChar == ')') { // Закрывающая скобка
-                closeParentheses(operators, values);
-            } else if (Character.isLetter(currentChar)) { // Обрабатываем имена переменных и функций
-                StringBuilder identifier = new StringBuilder();
-
-                while ((i < expression.length()) && Character.isAlphabetic(expression.charAt(i)))
-                    identifier.append(expression.charAt(i++));
-                i--;
-
-                String id = identifier.toString();
-                usedVariables.add(id);
-
-                values.push(parseNumberOrFunction(id));
+                prevChar = 'n'; // число
+                continue;
             }
+
+            if (currentChar == '-') {
+                if (prevChar == null || prevChar == '(' || isOperator(prevChar)) {
+                    values.push(0.0);
+                    operators.push('-');
+                    prevChar = '-';
+                    continue;
+                }
+                processOperators(operators, values, currentChar);
+                prevChar = '-';
+                continue;
+            }
+
+            if (isOperator(currentChar)) {
+                processOperators(operators, values, currentChar);
+                prevChar = currentChar;
+                continue;
+            }
+
+            if (currentChar == '(') {
+                operators.push('(');
+                prevChar = '(';
+                continue;
+            }
+            if (currentChar == ')') {
+                closeParentheses(operators, values);
+                prevChar = ')';
+                continue;
+            }
+
+            if (Character.isLetter(currentChar)) {
+                StringBuilder nameBuilder = new StringBuilder();
+                while (i < expression.length() && Character.isLetterOrDigit(expression.charAt(i))) {
+                    nameBuilder.append(expression.charAt(i++));
+                }
+                int j = i;
+                while (j < expression.length() && Character.isWhitespace(expression.charAt(j))) j++;
+                String token;
+                if (j < expression.length() && expression.charAt(j) == '(') {
+                    StringBuilder funcBuilder = new StringBuilder();
+                    funcBuilder.append(nameBuilder); // имя функции
+                    int depth = 0;
+                    int k = j;
+                    boolean closed = false;
+                    while (k < expression.length()) {
+                        char c = expression.charAt(k);
+                        funcBuilder.append(c);
+                        if (c == '(') depth++;
+                        else if (c == ')') {
+                            depth--;
+                            if (depth == 0) {
+                                closed = true;
+                                k++;
+                                break;
+                            }
+                        }
+                        k++;
+                    }
+                    if (!closed) {
+                        throw new Exception("Ошибка: незакрытая скобка в вызове функции после '" + nameBuilder + "'");
+                    }
+                    token = funcBuilder.toString();
+                    i = k - 1;
+                } else {
+                    token = nameBuilder.toString();
+                    i = i - 1;
+                }
+                if (!token.contains("(")) {
+                    usedVariables.add(token);
+                }
+                values.push(parseNumberOrFunction(token));
+                prevChar = 'n';
+                continue;
+            }
+            throw new Exception("Неизвестный символ в выражении: '" + currentChar + "'");
         }
-
-        // Применяем оставшиеся операторы
-        while (!operators.empty())
+        while (!operators.empty()) {
             values.push(applyOperation(values.pop(), operators.pop(), values.pop()));
-
-        // Просим ввести значение для ещё не заданных переменных
+        }
         for (String var : usedVariables) {
             if (!variables.containsKey(var)) {
                 promptForVariableValue(var);
             }
         }
-
+        if (values.isEmpty()) throw new Exception("Пустой результат выражения");
         return values.pop();
     }
 
@@ -120,17 +187,29 @@ public class ExpressionSolver {
      * @throws Exception, если не преобразовать заданную строку в число
      */
     private double parseNumberOrFunction(String token) throws Exception {
-        if (token.matches("-?\\d+(?:\\.\\d+)?")) { // Простое число
+        token = token.trim();
+        if (token.matches("-?(?:\\d+\\.\\d*|\\.\\d+|\\d+)")) {
             return Double.parseDouble(token);
-        } else if (variables.containsKey(token)) { // Значение переменной
-            return variables.get(token);
-        } else if (token.startsWith("sin") || token.startsWith("cos")) { // Тригонометрические функции
-            String varName = token.substring(3, token.length()-1); // Извлекаем аргумент функции
-            double value = variables.get(varName);
-            return token.startsWith("sin") ? Math.sin(value) : Math.cos(value);
-        } else {
-            throw new Exception("Не определён элемент: " + token);
         }
+        if (!token.contains("(")) {
+            if (variables.containsKey(token)) {
+                return variables.get(token);
+            } else {
+                throw new Exception("Не определена переменная: " + token);
+            }
+        }
+        if (token.startsWith("sin(") && token.endsWith(")")) {
+            String inner = token.substring(4, token.length() - 1);
+            double innerVal = evaluate(inner);
+            return Math.sin(innerVal);
+        }
+        if (token.startsWith("cos(") && token.endsWith(")")) {
+            String inner = token.substring(4, token.length() - 1);
+            double innerVal = evaluate(inner);
+            return Math.cos(innerVal);
+        }
+
+        throw new Exception("Неизвестный токен: " + token);
     }
 
     /**
@@ -161,7 +240,7 @@ public class ExpressionSolver {
      * @return true, если символ - оператор, иначе возвращает false
      */
     private boolean isOperator(char ch) {
-        return ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '^';
+        return ch == '+' || ch == '*' || ch == '/' || ch == '^';
     }
 
     /**
@@ -170,10 +249,12 @@ public class ExpressionSolver {
      * @return приоритет заданного оператора
      */
     private int precedence(char op) {
-        if (op == '+' || op == '-') return 1;
-        if (op == '*' || op == '/') return 2;
-        if (op == '^') return 3;
-        return 0;
+        return switch (op) {
+            case '+', '-' -> 1;
+            case '*', '/' -> 2;
+            case '^' -> 3;
+            default -> 0;
+        };
     }
 
     /**
@@ -185,8 +266,9 @@ public class ExpressionSolver {
      * если в заданной пользователем строке введён некорректный оператор
      */
     private void processOperators(Stack<Character> operators, Stack<Double> values, char currentOp) throws Exception {
-        while (!operators.empty() && precedence(operators.peek()) >= precedence(currentOp))
+        while (!operators.empty() && precedence(operators.peek()) >= precedence(currentOp)) {
             values.push(applyOperation(values.pop(), operators.pop(), values.pop()));
+        }
         operators.push(currentOp);
     }
 
@@ -197,12 +279,13 @@ public class ExpressionSolver {
      * @throws Exception, если в скобочной структуре имеется ошибка
      */
     private void closeParentheses(Stack<Character> operators, Stack<Double> values) throws Exception {
-        while (!operators.empty() && operators.peek() != '(')
+        while (!operators.empty() && operators.peek() != '(') {
             values.push(applyOperation(values.pop(), operators.pop(), values.pop()));
+        }
 
-        if (!operators.empty())
-            operators.pop();
-        else
-            throw new Exception("Ошибка в скобочной структуре.");
+        if (operators.empty()) {
+            throw new Exception("Ошибка: нет соответствующей открывающей скобки '('");
+        }
+        operators.pop();
     }
 }
